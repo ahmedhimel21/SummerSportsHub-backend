@@ -35,6 +35,7 @@ async function run() {
 
     const classesCollection = client.db('summerSportsHub').collection('classesCollection');
     const instructorsCollection = client.db('summerSportsHub').collection('instructorsCollection');
+    const cartCollection = client.db('summerSportsHub').collection('cartCollection')
 
     // get all classes data
     app.get('/classes',async(req,res) =>{
@@ -48,6 +49,20 @@ async function run() {
       const cursor = instructorsCollection.find();
       const result = await cursor.toArray();
       res.send(result)
+    })
+    // get limited instructors data
+    app.get('/instructors/popular', async(req,res) =>{
+      const cursor = instructorsCollection.find();
+      const result = await cursor.limit(6).toArray();
+      res.send(result)
+    })
+
+    // post cart add to cart
+    app.post('/carts', async(req,res) =>{
+      const classItem = req.body;
+      console.log(classItem);
+      const result = await cartCollection.insertOne(classItem);
+      res.send(result);
     })
 
     // Send a ping to confirm a successful connection
