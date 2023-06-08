@@ -36,6 +36,7 @@ async function run() {
     const classesCollection = client.db('summerSportsHub').collection('classesCollection');
     const instructorsCollection = client.db('summerSportsHub').collection('instructorsCollection');
     const cartCollection = client.db('summerSportsHub').collection('cartCollection')
+    const usersCollection = client.db('summerSportsHub').collection('users')
 
     // get all classes data
     app.get('/classes',async(req,res) =>{
@@ -83,6 +84,23 @@ async function run() {
       const query = {_id: new ObjectId(id)}
       const result = await cartCollection.deleteOne(query);
       res.send(result);
+    })
+    // users related apis
+    app.post('/users',async(req,res) =>{
+      const user = req.body;
+      const query = {email: user.email}
+      const existingUser = await usersCollection.findOne(query);
+      if(existingUser){
+        return res.send(({message: 'User already exist'}))
+      }
+      const result = await usersCollection.insertOne(user);
+      res.send(result);
+    })
+
+    // get all user data
+    app.get('/users',async(req,res) =>{
+      const result = await usersCollection.find().toArray();
+      res.send(result)
     })
 
     // Send a ping to confirm a successful connection
