@@ -54,34 +54,46 @@ async function run() {
     const usersCollection = client.db('summerSportsHub').collection('users')
 
     // jwt related api
-    app.post('/jwt',(req,res) =>{
+    app.post('/jwt', (req, res) => {
       const user = req.body;
-      const token = jwt.sign(user,process.env.ACCESS_TOKEN_SECRET,{expiresIn: '1h'})
-      res.send({token});
-    })
+      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' })
+      res.send({ token });
+    });
+
+    // verify admin middleware
+    const verifyAdmin = async (req, res, next) => {
+      const email = req.decoded.email;
+      const query = { email: email }
+      const user = await usersCollection.findOne(query);
+      console.log(user)
+      if (user?.role !== 'admin') {
+        return res.status.send({ error: true, message: 'forbidden' })
+      }
+      next();
+    }
 
     // get all classes data
-    app.get('/classes',async(req,res) =>{
+    app.get('/classes', async (req, res) => {
       const cursor = classesCollection.find();
       const result = await cursor.toArray();
       res.send(result)
     })
 
     // get all instructors data
-    app.get('/instructors', async(req,res) =>{
+    app.get('/instructors', async (req, res) => {
       const cursor = instructorsCollection.find();
       const result = await cursor.toArray();
       res.send(result)
     })
     // get limited instructors data
-    app.get('/instructors/popular', async(req,res) =>{
+    app.get('/instructors/popular', async (req, res) => {
       const cursor = instructorsCollection.find();
       const result = await cursor.limit(6).toArray();
       res.send(result)
     })
 
     // post cart add to cart
-    app.post('/carts', async(req,res) =>{
+    app.post('/carts', async (req, res) => {
       const classItem = req.body;
       console.log(classItem);
       const result = await cartCollection.insertOne(classItem);
@@ -89,68 +101,93 @@ async function run() {
     })
 
     // read specific user cart data
-    app.get('/carts', verifyJWT, async(req,res) =>{
+    app.get('/carts', verifyJWT, async (req, res) => {
       const email = req.query.email
       console.log(email)
-      if(!email){
+      if (!email) {
         res.send([]);
       };
 
       const decodedEmail = req.decoded.email;
-      if(email !== decodedEmail){
-        return res.status(403).send({error: true,message:'forbidden access'})
+      if (email !== decodedEmail) {
+        return res.status(403).send({ error: true, message: 'forbidden access' })
       };
 
-      const query = {email: email}
+      const query = { email: email }
       const result = await cartCollection.find(query).toArray()
       res.send(result)
     })
 
     // delete cart data using id
-    app.delete('/carts/:id', async(req,res) =>{
+    app.delete('/carts/:id', async (req, res) => {
       const id = req.params.id
-      const query = {_id: new ObjectId(id)}
+      const query = { _id: new ObjectId(id) }
       const result = await cartCollection.deleteOne(query);
       res.send(result);
     })
 
     // users related apis
-    app.post('/users',async(req,res) =>{
+    app.post('/users', async (req, res) => {
       const user = req.body;
-      const query = {email: user.email}
+      const query = { email: user.email }
       const existingUser = await usersCollection.findOne(query);
-      if(existingUser){
-        return res.send(({message: 'User already exist'}))
+      if (existingUser) {
+        return res.send(({ message: 'User already exist' }))
       }
       const result = await usersCollection.insertOne(user);
       res.send(result);
     })
 
     // get all user data
-    app.get('/users',async(req,res) =>{
+    app.get('/users', verifyJWT, verifyAdmin, async (req, res) => {
       const result = await usersCollection.find().toArray();
       res.send(result)
     });
 
     // admin update api
-    app.patch('/users/admin/:id',async(req,res) =>{
+    app.patch('/users/admin/:id', async (req, res) => {
       const id = req.params.id;
-      const filter = {_id: new ObjectId(id)}
+      const filter = { _id: new ObjectId(id) }
       const updateDoc = {
-        $set: {role: 'admin'}
+        $set: { role: 'admin' }
       }
-      const result = await usersCollection.updateOne(filter,updateDoc);
+      const result = await usersCollection.updateOne(filter, updateDoc);
       res.send(result);
     })
-    // instructor update api
-     app.patch('/users/instructor/:id',async(req,res) =>{
-      const id = req.params.id;
-      const filter = {_id: new ObjectId(id)}
-      const updateDoc = {
-        $set: {role: 'instructor'}
+
+    // check admin
+    app.get('/users/admin/:email', verifyJWT, async (req, res) => {
+      const email = req.params.email;
+      if (req.decoded.email !== email) {
+        res.send({ admin: false })
       }
-      const result = await usersCollection.updateOne(filter,updateDoc);
+      const query = { email: email }
+      const user = await usersCollection.findOne(query);
+      const result = { admin: user?.role === 'admin' }
+      res.send(result)
+    })
+
+    // instructor update api
+    app.patch('/users/instructor/:id', async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) }
+      const updateDoc = {
+        $set: { role: 'instructor' }
+      }
+      const result = await usersCollection.updateOne(filter, updateDoc);
       res.send(result);
+    })
+
+    // check instructor
+    app.get('/users/instructor/:email', verifyJWT, async (req, res) => {
+      const email = req.params.email;
+      if (req.decoded.email !== email) {
+        res.send({ instructor: false })
+      }
+      const query = { email: email }
+      const user = await usersCollection.findOne(query);
+      const result = { instructor: user?.role === 'instructor' }
+      res.send(result)
     })
 
     // Send a ping to confirm a successful connection
