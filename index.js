@@ -3,6 +3,7 @@ const app = express();
 const cors = require('cors');
 require('dotenv').config();
 const jwt = require('jsonwebtoken');
+const stripe = require('stripe')(process.env.PAYMENT_SECRET_KEY)
 const port = process.env.PORT || 5000;
 
 // middleware
@@ -52,6 +53,7 @@ async function run() {
     const instructorsCollection = client.db('summerSportsHub').collection('instructorsCollection');
     const cartCollection = client.db('summerSportsHub').collection('cartCollection')
     const usersCollection = client.db('summerSportsHub').collection('users')
+    const paymentCollection = client.db("summerSportsHub").collection("payments");
 
     // jwt related api
     app.post('/jwt', (req, res) => {
@@ -97,6 +99,13 @@ async function run() {
       const classItem = req.body;
       console.log(classItem);
       const result = await cartCollection.insertOne(classItem);
+      res.send(result);
+    })
+
+    app.get('/carts/:id', async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) }
+      const result = await cartCollection.findOne(query);
       res.send(result);
     })
 
@@ -189,6 +198,38 @@ async function run() {
       const result = { instructor: user?.role === 'instructor' }
       res.send(result)
     })
+
+
+    // payment intent
+    app.post('/create-payment-intent', verifyJWT, async (req, res) => {
+      const { price } = req.body;
+      const amount = parseInt(price * 100);
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amount,
+        currency: 'usd',
+        payment_method_types: ['card']
+      });
+
+      res.send({
+        clientSecret: paymentIntent.client_secret
+      })
+    })
+
+    // payment related api
+    app.post('/payments', verifyJWT, async (req, res) => {
+      const payment = req.body;
+      const insertResult = await paymentCollection.insertOne(payment);
+      console.log(payment);
+      const id = payment.cartItems;
+      console.log(id);
+      // const query = { _id: { $in: payment.cartItems.map(id => new ObjectId(id)) } }
+      // const deleteResult = await cartCollection.deleteOne(query)
+      const query = { _id: new ObjectId(id) }
+      const deleteResult = await cartCollection.deleteOne(query)
+
+      res.send({ insertResult, deleteResult });
+    })
+
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
