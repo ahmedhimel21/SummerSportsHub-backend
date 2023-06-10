@@ -54,6 +54,7 @@ async function run() {
     const cartCollection = client.db('summerSportsHub').collection('cartCollection')
     const usersCollection = client.db('summerSportsHub').collection('users')
     const paymentCollection = client.db("summerSportsHub").collection("payments");
+    const instructorsAddedClassCollection = client.db("summerSportsHub").collection("instructorsClasses");
 
     // jwt related api
     app.post('/jwt', (req, res) => {
@@ -82,7 +83,7 @@ async function run() {
     })
 
     // post instructors data
-    app.post('/instructors', async(req,res) =>{
+    app.post('/instructors', async (req, res) => {
       const data = req.body;
       const result = await instructorsCollection.insertOne(data);
       res.send(result);
@@ -207,6 +208,63 @@ async function run() {
       res.send(result)
     })
 
+    // instructors post classes
+    app.post('/instructorsClasses', async (req, res) => {
+      const data = req.body;
+      const result = await instructorsAddedClassCollection.insertOne(data);
+      res.send(result);
+    })
+
+    // update specific data
+    app.patch('/instructorsClasses/approved/:id', async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) }
+      const updateDoc = {
+        $set: { status: 'Approved' }
+      }
+      const result = await instructorsAddedClassCollection.updateOne(filter, updateDoc);
+      res.send(result);
+    })
+    // update deny button
+    app.patch('/instructorsClasses/denied/:id', async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) }
+      const updateDoc = {
+        $set: { status: 'denied' }
+      }
+      const result = await instructorsAddedClassCollection.updateOne(filter, updateDoc);
+      res.send(result);
+    })
+    // update feedback
+    app.patch('/instructorsClasses/feedback/:id', async (req, res) => {
+      const id = req.params.id;
+      const data = req.body;
+      const filter = { _id: new ObjectId(id) }
+      const updateDoc = {
+        $set: { feedback: data }
+      }
+      const result = await instructorsAddedClassCollection.updateOne(filter, updateDoc);
+      res.send(result);
+    })
+
+    // get instructors classes
+    app.get('/instructorsClasses', async (req, res) => {
+      const cursor = instructorsAddedClassCollection.find();
+      const result = await cursor.toArray();
+      res.send(result);
+    })
+
+    // filter instructors specific classes
+    app.get('/instructorClassesByEmail', async(req,res) =>{
+      console.log(req.query.email);
+      let query = {};
+      if(req.query?.email){
+        query = {instructorEmail: req.query.email}
+      };
+      const result = await instructorsAddedClassCollection.find(query).toArray();
+      console.log(result)
+      res.send(result);
+    })
 
     // payment intent
     app.post('/create-payment-intent', verifyJWT, async (req, res) => {
@@ -238,11 +296,11 @@ async function run() {
       res.send({ insertResult, deleteResult });
     });
 
-    app.get('/payments', async(req,res) =>{
+    app.get('/payments', async (req, res) => {
       console.log(req.query.email);
       let query = {};
-      if(req.query?.email){
-        query = {email: req.query.email}
+      if (req.query?.email) {
+        query = { email: req.query.email }
       };
       const cursor = paymentCollection.find(query);
       const result = await cursor.toArray();
