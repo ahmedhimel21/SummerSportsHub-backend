@@ -81,12 +81,20 @@ async function run() {
       res.send(result)
     })
 
+    // post instructors data
+    app.post('/instructors', async(req,res) =>{
+      const data = req.body;
+      const result = await instructorsCollection.insertOne(data);
+      res.send(result);
+    })
+
     // get all instructors data
     app.get('/instructors', async (req, res) => {
       const cursor = instructorsCollection.find();
       const result = await cursor.toArray();
       res.send(result)
     })
+
     // get limited instructors data
     app.get('/instructors/popular', async (req, res) => {
       const cursor = instructorsCollection.find();
@@ -213,7 +221,7 @@ async function run() {
       res.send({
         clientSecret: paymentIntent.client_secret
       })
-    })
+    });
 
     // payment related api
     app.post('/payments', verifyJWT, async (req, res) => {
@@ -228,7 +236,18 @@ async function run() {
       const deleteResult = await cartCollection.deleteOne(query)
 
       res.send({ insertResult, deleteResult });
-    })
+    });
+
+    app.get('/payments', async(req,res) =>{
+      console.log(req.query.email);
+      let query = {};
+      if(req.query?.email){
+        query = {email: req.query.email}
+      };
+      const cursor = paymentCollection.find(query);
+      const result = await cursor.toArray();
+      res.send(result)
+    });
 
 
     // Send a ping to confirm a successful connection
