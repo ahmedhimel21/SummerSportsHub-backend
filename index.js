@@ -82,11 +82,10 @@ async function run() {
       res.send(result)
     })
 
-    // post classes
-    app.post('/classes',async(req,res) =>{
-      const data = req.body;
-      const result = await classesCollection.insertOne(data);
-      res.send(result)
+    // get popular classes
+    app.get('/popularClasses', async (req, res) => {
+      const result = await classesCollection.find().sort({ enrolledStudents: -1 }).limit(6).toArray();
+      res.send(result);
     });
 
     // post instructors data
@@ -222,16 +221,48 @@ async function run() {
       res.send(result);
     })
 
-    // update specific data
     app.patch('/instructorsClasses/approved/:id', async (req, res) => {
       const id = req.params.id;
-      const filter = { _id: new ObjectId(id) }
+      const filter = { _id: new ObjectId(id) };
       const updateDoc = {
         $set: { status: 'Approved' }
-      }
+      };
+
       const result = await instructorsAddedClassCollection.updateOne(filter, updateDoc);
-      res.send(result);
-    })
+
+      if (result.modifiedCount === 1) {
+        const classesFilter = { _id: new ObjectId(id) };
+
+        const addedClass = await instructorsAddedClassCollection.findOne(classesFilter);
+
+        if (addedClass) {
+          const classesResult = await classesCollection.insertOne({
+            _id: addedClass._id,
+            name: addedClass.className,
+            email: addedClass.instructorEmail,
+            image: addedClass.classImage,
+            instructor: addedClass.instructor,
+            seats: parseFloat(addedClass.availableSeats),
+            price: parseFloat(addedClass.price),
+            enrolledStudents: parseFloat(addedClass.enrolledStudents),
+            status: 'Approved'
+          });
+
+          if (classesResult.insertedId) {
+            res.send({ success: true });
+          } else {
+            res.status(500).send({ error:'Internal server error' });
+          }
+        } else {
+          res.status(404).send({ error: 'not found' });
+        }
+      } else {
+        res.status(500).send({ error: 'service unavailable' });
+      }
+    });
+
+
+
     // update deny button
     app.patch('/instructorsClasses/denied/:id', async (req, res) => {
       const id = req.params.id;
@@ -262,11 +293,11 @@ async function run() {
     })
 
     // filter instructors specific classes
-    app.get('/instructorClassesByEmail', async(req,res) =>{
+    app.get('/instructorClassesByEmail', async (req, res) => {
       console.log(req.query.email);
       let query = {};
-      if(req.query?.email){
-        query = {instructorEmail: req.query.email}
+      if (req.query?.email) {
+        query = { instructorEmail: req.query.email }
       };
       const result = await instructorsAddedClassCollection.find(query).toArray();
       console.log(result)
@@ -295,10 +326,34 @@ async function run() {
       console.log(payment);
       const id = payment.cartItems;
       console.log(id);
-      // const query = { _id: { $in: payment.cartItems.map(id => new ObjectId(id)) } }
-      // const deleteResult = await cartCollection.deleteOne(query)
+
       const query = { _id: new ObjectId(id) }
       const deleteResult = await cartCollection.deleteOne(query)
+
+      if (insertResult.acknowledged && deleteResult.deletedCount === 1) {
+        const classUpdateResult = await classesCollection.updateOne(
+          { _id: new ObjectId(payment.classItems) },
+          {
+            $inc: {
+              seats: -1,
+              enrolledStudents: 1
+            }
+          }
+        );
+
+        const instructorClassUpdateResult = await instructorsAddedClassCollection.updateOne(
+          { _id: new ObjectId(payment.classItems) },
+          {
+            $inc: {
+
+
+              availableSeats: -1,
+
+              enrolledStudents: 1
+            }
+          }
+        );
+      }
 
       res.send({ insertResult, deleteResult });
     });
@@ -309,7 +364,7 @@ async function run() {
       if (req.query?.email) {
         query = { email: req.query.email }
       };
-      const cursor = paymentCollection.find(query);
+      const cursor = paymentCollection.find(query).sort({ date: -1 });
       const result = await cursor.toArray();
       res.send(result)
     });
