@@ -82,6 +82,13 @@ async function run() {
       res.send(result)
     })
 
+    // post classes
+    app.post('/classes',async(req,res) =>{
+      const data = req.body;
+      const result = await classesCollection.insertOne(data);
+      res.send(result)
+    });
+
     // post instructors data
     app.post('/instructors', async (req, res) => {
       const data = req.body;
